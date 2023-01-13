@@ -1,0 +1,8 @@
+---
+# Global variables that are common across all servers
+
+splunk_home: /opt/splunk
+splunk_bin: "{{ splunk_home }}/bin/./splunk"
+master_apps: "{{ splunk_home }}/etc/master-apps"
+splunk_user: admin
+splunk_pass: 5up3rn0va

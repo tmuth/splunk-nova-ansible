@@ -1,0 +1,13 @@
+[ csv_with_header ]
+DATETIME_CONFIG=CURRENT
+SHOULD_LINEMERGE=false
+LINE_BREAKER=([\r\n]+)
+NO_BINARY_CHECK=true
+CHARSET=UTF-8
+INDEXED_EXTRACTIONS=csv
+KV_MODE=none
+category=Structured
+description=Comma-separated value format. Set header and other settings in "Delimited Settings"
+disabled=false
+pulldown_type=true
+HEADER_FIELD_LINE_NUMBER=1

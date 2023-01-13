@@ -1,0 +1,12 @@
+# This takes the ecdsa public key from your local computer and adds it to .ssh/authorized_keys
+# and sets up all of the proper permissions. 
+# To create a new keypair (from: https://www.ssh.com/ssh/keygen/):
+# ssh-keygen -f ~/.ssh/id_ecdsa -t ecdsa -b 521
+# To debug connections run: ssh -vv splunker@sh1 and view debug output
+
+- name: Set authorized key taken from file
+  authorized_key:
+    user: splunker
+    state: present
+    key: "{{ lookup('file', '~/.ssh/id_ecdsa.pub') }}"
+  tags: common

@@ -1,0 +1,27 @@
+---
+# This playbook will update the /etc/hosts file on your local machine with entries from the hosts file
+# one level up. This makes it easier to ssh vi hostname instead of ip address and allows you to use
+# the hostname in the URL of the browser
+#
+# Usage:
+# ansible-playbook -i ../hosts update-local-hosts.yml -K
+# The -K parameter tells ansible to ask you for your password so it can sudo to edit /etc/hosts
+
+- hosts: localhost
+  gather_facts: no
+  connection: local
+  
+  tasks:
+
+    - debug:
+        msg: "Item {{ hostvars[item].ansible_host }} {{ item }}"
+      with_items: "{{ groups.all }}"
+
+    - name: Add IP address of all hosts to all hosts
+      lineinfile:
+        dest: /etc/hosts
+        regexp: '.*\t{{ item }}$'
+        line: "{{ hostvars[item].ansible_host }}\t{{item}}"
+        state: present
+      when: hostvars[item].ansible_host is defined
+      with_items: "{{ groups.all }}"

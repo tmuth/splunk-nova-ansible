@@ -1,0 +1,19 @@
+indexes:
+- index: tutorial
+- index: hosts
+- index: people
+- index: os
+- index: traffic
+  attributes:
+    - key: tsidxWritingLevel
+      val: 3
+    - key: journalCompression
+      val: zstd
+- index: idx1
+  attributes:
+    - key: tsidxWritingLevel
+      val: 3
+- index: idx2
+  attributes:
+    - key: journalCompression
+      val: zstd

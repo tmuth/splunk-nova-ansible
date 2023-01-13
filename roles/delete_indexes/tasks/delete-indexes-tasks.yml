@@ -1,0 +1,29 @@
+---
+# This playbook will configure the cluster_master
+
+# - name: Include list of data files to load
+#   include_vars: ../../../group_vars/load_data.yml
+
+# - name: Copy data to Search Head for oneshot load
+#   when: true
+#   copy:
+#     src: data
+#     dest: /home/splunk
+#     owner: splunk
+#     group: splunk
+#     mode: '0644'
+
+
+- name: Include Custom Index Attributes
+  include_vars: ../../../group_vars/cluster_indexes.yml
+
+- name: List Sections
+  debug:
+    msg: "Section={{ item.0.index }} key={{ item.1.key }} val={{ item.1.val }}"
+  when: item.1 is defined
+  with_subelements:
+    - "{{ indexes }}"
+    - attributes
+    - skip_missing: True
+  local_action: cluster_master
+  #tags: [ never, debug ]

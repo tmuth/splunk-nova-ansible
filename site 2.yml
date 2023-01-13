@@ -1,0 +1,24 @@
+---
+# This playbook deploys the whole application stack in this site.
+
+
+- hosts: all
+  tasks:
+    - include_role:
+        name: common
+      when: true
+      tags: common
+
+- hosts: cluster_master
+  tasks:
+    - include_role:
+        name: cluster_master
+      when: true
+      tags: cluster_master
+
+- hosts: sh1
+  tasks:
+    - include_role:
+        name: sh1
+      when: true
+      tags: sh1,oneshot,install-apps,copy-data,copy-apps

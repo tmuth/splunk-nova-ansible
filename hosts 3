@@ -1,0 +1,21 @@
+[all:vars]
+ansible_connection=ssh
+ansible_user=splunker
+ansible_ssh_pass=splk
+ansible_become=yes
+ansible_become_method=sudo
+ansible_become_user=root
+
+[cluster_master]
+master1 ansible_host=10.202.6.71
+
+[search_heads]
+sh1 ansible_host=10.202.5.109
+
+[indexers]
+idx1 ansible_host=10.202.2.43
+idx2 ansible_host=10.202.6.150
+idx3 ansible_host=10.202.7.18
+
+[license_master]
+lm1 ansible_host=10.202.2.63

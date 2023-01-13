@@ -1,0 +1,107 @@
+---
+# This playbook will configure the cluster_master
+
+- name: Copy apps to Cluser Master for installation
+  when: true
+  copy:
+    src: apps-indexers/
+    dest: "{{ master_apps }}"
+    owner: splunk
+    group: splunk
+    mode: '0644'
+  tags: cluster_master,copy-apps
+
+- name: Include Default Index Attributes
+  include_vars: default_index_attributes.yml
+  tags: cluster_master,create-indexes
+
+- name: Include Custom Index Attributes
+  include_vars: ../../../group_vars/cluster_indexes.yml
+  tags: cluster_master,create-indexes
+
+- name: List Sections
+  debug:
+    msg: "Section={{ item.0.index }} key={{ item.1.key }} val={{ item.1.val }}"
+  when: item.1 is defined and false
+  with_subelements:
+    - "{{ indexes }}"
+    - attributes
+    - skip_missing: True
+  tags: [ never, debug ]
+
+- name: List Default Sections
+  debug:
+    msg: "Section={{ item.0.index }} key={{ item.1.key }} val={{ item.1.value }}"
+  when: item.1 is defined and false
+  loop: "{{ indexes |product( lookup('dict', default_idx_attributes) )|list }}"
+  tags: [ never, debug ]
+
+- name: Create default index attributes
+  when: true
+  ini_file:
+    path: "{{ master_apps }}/_cluster/local/indexes.conf"
+    section: "{{ item.0.index }}"
+    option:  "{{ item.1.key }}"
+    value: "{{ item.1.value }}"
+    mode: '0644'
+    backup: false
+  loop: "{{ indexes |product( lookup('dict', default_idx_attributes) )|list }}"
+  tags: cluster_master,create-indexes
+
+- name: Add extra attributes for indexes
+  when: true
+  ini_file:
+    path: "{{ master_apps }}/_cluster/local/indexes.conf"
+    section: "{{ item.0.index }}"
+    option:  "{{ item.1.key }}"
+    value: "{{ item.1.val }}"
+    mode: '0644'
+    backup: false
+  with_subelements:
+    - "{{ indexes }}"
+    - attributes
+    - skip_missing: True
+  tags: cluster_master,create-indexes
+
+- name: Validate cluster bundle
+  shell: "{{ splunk_bin }} validate cluster-bundle  --check-restart -auth {{ splunk_user }}:'{{ splunk_pass }}'"
+  register: shell_result
+  tags: cluster_master,create-indexes
+
+# - name: debug cluster bundle
+#   debug:
+#     var: shell_result.stdout_lines
+#   tags: [ never, debug ]
+
+- name: Show cluster bundle status
+  shell: "{{ splunk_bin }} show cluster-bundle-status -auth {{ splunk_user }}:'{{ splunk_pass }}'"
+  register: result
+  until: result.stdout.find("last_validation_succeeded=1") != -1
+  retries: 10
+  delay: 5
+  tags: cluster_master,create-indexes
+
+# - name: debug cluster bundle status
+#   debug:
+#     var: result.stdout_lines
+
+- name: Apply cluster bundle
+  shell: "{{ splunk_bin }} apply cluster-bundle  --answer-yes -auth {{ splunk_user }}:'{{ splunk_pass }}'"
+  register: shell_result
+  tags: cluster_master,create-indexes
+
+- name: Fetch indexes.conf from cluster master to local
+  fetch:
+    src: "{{ master_apps }}/_cluster/local/indexes.conf"
+    dest: tmp/indexes.conf
+    flat: true
+    tags: cluster_master,create-indexes
+
+- name: Add custom bash_profile entries
+  blockinfile:
+    path: /etc/profile.d/custom.sh
+    create: yes
+    marker: '# {mark} ANSIBLE MANAGED BLOCK - CLUSTER_MASTER'
+    block: |
+      # Customizations from ansible roles/cluser_master/tasks/cluster-master-tasks.yml
+      alias mapps='cd $SPLUNK_HOME/etc/master-apps'

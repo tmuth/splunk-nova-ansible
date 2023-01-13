@@ -1,0 +1,21 @@
+files:
+  - source: tutorialdata.zip
+    index: tutorial
+    host_segment: 1
+  - source: hosts-10k-subset.csv.gz
+    index: hosts
+    sourcetype: csv_with_header
+  - source: hosts-10k.csv.gz
+    index: hosts
+    sourcetype: csv_with_header
+  - source: Traffic_Violations-API.csv.gz
+    # from https://data.montgomerycountymd.gov/Public-Safety/Traffic-Violations-API
+    index: traffic
+    sourcetype: csv
+  - source: people1.json.gz
+    index: people
+    sourcetype: _json
+  - source: people2.json.gz
+    index: people
+    sourcetype: _json
+    

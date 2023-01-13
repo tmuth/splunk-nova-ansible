@@ -1,0 +1,3 @@
+---
+- include: common-tasks.yml
+- include: distribute-ssh-keys.yml

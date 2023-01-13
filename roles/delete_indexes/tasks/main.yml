@@ -1,0 +1,3 @@
+---
+- include: delete-indexes-tasks.yml
+  tags: delete-indexes

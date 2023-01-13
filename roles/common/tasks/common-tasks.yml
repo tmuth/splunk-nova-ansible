@@ -1,0 +1,30 @@
+---
+# This playbook contains common plays that will be run on all nodes.
+- name: Add custom bash_profile entries
+  blockinfile:
+    path: /etc/profile.d/custom.sh
+    create: yes
+    marker: '# {mark} ANSIBLE MANAGED BLOCK - COMMON'
+    block: |
+      # Customizations from ansible roles/common/tasks/common-tasks.yml
+
+      # Skip all for noninteractive shells.
+      [ ! -t 0 ] && return
+
+      export SPLUNK_HOME=/opt/splunk
+      export PATH=$PATH:$SPLUNK_HOME/bin
+      alias shome='cd $SPLUNK_HOME'
+      alias http='echo "Starting http server on port 8888";python -m SimpleHTTPServer 8888'
+  tags: common
+
+
+- name: Install a list of yum packages
+  when: true
+  yum:
+    name:
+      - screen.x86_64
+      - nmap-ncat.x86_64
+      - htop.x86_64
+      #- python3
+    state: present
+  tags: common

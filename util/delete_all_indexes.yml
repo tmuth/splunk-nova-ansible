@@ -1,0 +1,87 @@
+---
+# This playbook will delete all indexes listed in ../group_vars/cluster_indexes.yml
+
+- hosts: cluster_master
+  gather_facts: yes
+  vars:
+    run_task: false
+    file_date_time: "{{ ansible_date_time.iso8601_basic_short }}"
+
+
+
+  tasks: 
+    - name: Include Custom Index Attributes
+      include_vars: ../group_vars/cluster_indexes.yml
+      # debugger: always
+
+    - name: Backup existing indexes.conf
+      copy: 
+        remote_src: True 
+        src: "{{ master_apps }}/_cluster/local/indexes.conf" 
+        dest: "{{ master_apps }}/_cluster/local/indexes.conf.{{ file_date_time }}" 
+
+    - name: Delete indexes.conf
+      file:
+        path: "{{ master_apps }}/_cluster/local/indexes.conf" 
+        state: absent
+    
+    - name: Create blank indexes.conf
+      copy:
+        content: "\n"
+        dest: "{{ master_apps }}/_cluster/local/indexes.conf" 
+        force: no
+        group: splunk
+        owner: splunk
+        mode: 0644
+
+    - name: Validate cluster bundle
+      shell: "{{ splunk_bin }} validate cluster-bundle  --check-restart -auth {{ splunk_user }}:'{{ splunk_pass }}'"
+      register: shell_result
+
+    # - name: debug cluster bundle
+    #   debug:
+    #     var: shell_result.stdout_lines
+    #   tags: [ never, debug ]
+
+    - name: Show cluster bundle status
+      shell: "{{ splunk_bin }} show cluster-bundle-status -auth {{ splunk_user }}:'{{ splunk_pass }}'"
+      register: result
+      until: result.stdout.find("last_validation_succeeded=1") != -1 and result.stdout.find("cluster_status=None") != -1
+      retries: 10
+      delay: 5
+
+    # - name: debug cluster bundle status
+    #   debug:
+    #     var: result.stdout_lines
+
+    - name: Apply cluster bundle
+      shell: "{{ splunk_bin }} apply cluster-bundle  --answer-yes -auth {{ splunk_user }}:'{{ splunk_pass }}'"
+      register: shell_result
+
+    - name: List Sections
+      debug:
+        msg: "Section={{ item.index }} date: {{ file_date_time }}"
+      with_items:
+        - "{{ indexes }}"
+      tags: [ never, debug ]
+
+- hosts: indexers
+  gather_facts: yes
+  vars:
+    run_task: false
+    file_date_time: "{{ ansible_date_time.iso8601_basic_short }}"
+
+
+
+  tasks: 
+    - name: Include Custom Index Attributes
+      include_vars: ../group_vars/cluster_indexes.yml
+      # debugger: always
+
+    #/opt/splunk/var/lib/splunk
+    - name: Delete index directories
+      file:
+        state: absent
+        path: "/opt/splunk/var/lib/splunk/{{ item.index }}/"
+      with_items:
+        - "{{ indexes }}"

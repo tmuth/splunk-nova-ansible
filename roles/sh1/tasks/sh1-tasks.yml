@@ -1,0 +1,177 @@
+- name: Include list of data files to load
+  include_vars: ../../../group_vars/load_data.yml
+  tags: oneshot
+
+- name: Create target directory for indexes.conf
+  file: path=/opt/splunk/etc/apps/search/local state=directory mode=0755
+
+- name: Copy indexes.conf from local to search head so it's populates UI
+  when: true
+  copy:
+    src: tmp/indexes.conf
+    dest: "{{ splunk_home }}/etc/apps/search/local/indexes.conf"
+    owner: splunk
+    group: splunk
+    mode: '0644'
+  tags: copy-data
+
+- name: Set auto load balance by size in bytes 
+  # Yes, 10kb is small, but in the context of demo/sample data I wanted to get good distribution
+  when: true
+  ini_file:
+    path: "{{ splunk_home }}/etc/system/local/outputs.conf"
+    section: "tcpout:group1"
+    option:  "autoLBVolume"
+    value: "10240"
+    mode: '0644'
+    backup: false
+
+- name: Copy data to Search Head for oneshot load
+  when: true
+  copy:
+    src: data
+    dest: /home/splunk
+    owner: splunk
+    group: splunk
+    mode: '0644'
+  tags: copy-data
+
+- name: Copy Search-Time apps to Search Head for installation
+  when: true
+  copy:
+    src: apps-sh
+    dest: /home/splunk
+    owner: splunk
+    group: splunk
+    mode: '0644'
+  tags: copy-apps
+
+- name: Copy Index-Time apps to Search Head for installation
+  # We are using the search head for eventgen and oneshot loads so we need index-time config
+  when: true
+  copy:
+    src: apps-indexers/
+    dest: /home/splunk/apps-sh
+    owner: splunk
+    group: splunk
+    mode: '0644'
+  tags: copy-apps
+
+- name: Get files on remote host
+  when: true
+  find:
+    paths:
+      - /home/splunk/data
+    file_type: file
+    patterns: '*'
+  register: data
+  tags: oneshot
+
+- name: List data files
+  when: true
+  debug: 
+    msg: "Data Files: {{item.path}} , Name {{ item.path | basename | regex_replace('\\+[\\w]+~([^~]+).*', '\\1') }} "
+  with_items: "{{ data.files }}"
+  tags: [ never, debug ]
+
+- name: Get apps on remote host that end in .spl or .tgz
+  when: true
+  find:
+    paths: 
+      - /home/splunk/apps-sh
+    patterns: '*.spl,*.tgz'
+  register: apps
+  tags: install-apps
+
+- name: Install app via REST from the list of apps in the above find task
+  when: true
+  uri:
+    url: "https://localhost:8089/services/apps/local"
+    method: POST
+    user: "{{ splunk_user }}"
+    password: "{{ splunk_pass }}"
+    validate_certs: false
+    body:
+      name: "{{ item.path }}"
+      update: "true"
+      filename: "true"
+    body_format: "form-urlencoded"
+    status_code: [ 200, 201 ]
+    timeout: 90
+  register: post_apps_local
+  changed_when: post_apps_local.status == 201
+  with_items: "{{ apps.files }}"
+  tags: install-apps
+
+- name: check if eventgen is installed
+  stat: 
+    path: "{{ splunk_home }}/etc/apps/SA-Eventgen"
+  register: eventgen_dir
+  tags: install-apps,eventgen-config
+
+- name: Enable eventgen
+  ini_file:
+    path: "{{ splunk_home }}/etc/apps/SA-Eventgen/local/inputs.conf"
+    section: "modinput_eventgen://default"
+    option:  "disabled"
+    value: "0"
+    mode: '0644'
+    backup: false
+  when: eventgen_dir.stat.exists == true
+  tags: install-apps
+
+
+- name: Get eventgen files on remote host
+  find:
+    paths:
+      - /home/splunk/apps-sh/eventgen_config
+    file_type: file
+    patterns: '*'
+  register: eventgen_files
+  when: eventgen_dir.stat.exists == true
+  tags: eventgen-config
+
+- name: Unarchive eventgen configurations
+  unarchive:
+    src: "{{ item }}"
+    dest: "{{ splunk_home }}/etc/apps"
+    remote_src: yes
+  with_items: "{{ eventgen_files.files|map(attribute='path')|list }}"
+  tags: eventgen-config
+
+
+- name: Restart Search Head
+  command: "{{ splunk_bin }} restart"
+  register: shell_result
+  tags: install-apps
+
+
+
+- name: use shell to print list of file paths
+  debug:
+    msg: "file: {{ item }} "
+  with_items: "{{ data.files|map(attribute='path')|list }}"
+  tags: [ never, debug ]
+
+- set_fact:
+    oneshot_commands: >-
+      {% for item in files %}{% for x in item|dict2items %}-{{ x.key }} {% if x.key  == 'source' %}/home/splunk/data/{% endif %}{{ x.value }} {% endfor %}{% if not loop.last %},{% endif %}{% endfor %}
+  tags: oneshot
+
+
+- name: Oneshot load via command
+  #command: "{{ splunk_bin }} add oneshot /home/splunk/data/{{item.file}} -auth {{ splunk_user }}:{{ splunk_pass }} -index {{ item.index }} -sourcetype {{ item.sourcetype }} -host_segment {{ item.host_segment | default(0) }}"
+  command: "{{ splunk_bin }} add oneshot {{ item }} -auth {{ splunk_user }}:{{ splunk_pass }} "
+  register: shell_result
+  with_items: "{{  oneshot_commands.split(',') }}"
+  tags: oneshot
+
+#  - name: manage packages
+#       debug: msg="{{ item.file }} index={{ item.index }} sourcetype={{ item.sourcetype }}"
+#       with_items: '{{ files }}'
+
+- name: debug oneshot
+  debug:
+    msg: "{{ shell_result }}"
+  tags: [ never, debug ]
+
